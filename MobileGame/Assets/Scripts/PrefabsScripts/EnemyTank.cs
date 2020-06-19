@@ -266,7 +266,7 @@ public class EnemyTank : MonoBehaviour
     }
     private void Dying()
     {
-        GameObject.Find("Score").GetComponent<Score>().KilledTanksScore += _HP;
+        Score.Instance.KilledTanksScore += _HP;
         DifficultyIncreasing();
 
         this.gameObject.SetActive(false);

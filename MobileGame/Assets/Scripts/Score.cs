@@ -1,13 +1,16 @@
 ﻿using System.Collections;
 using System.Collections.Generic;
 using System.Net.Http;
-using UnityEngine;
 using UnityEngine.UI;
+using UnityEngine;
+using TMPro;
 
 public class Score : Singleton<Score>
 {
-    [SerializeField] private Text _scoreText;
-    [SerializeField] private Text _highestScoreText;
+    [SerializeField] private TMP_Text _scoreText;
+    [SerializeField] private TMP_Text _highestScoreText;
+    [SerializeField] private Button   ResetButton;
+    [SerializeField] private Button   ToMenuButton;
 
     [SerializeField] private GameObject _player;
 
@@ -52,7 +55,7 @@ public class Score : Singleton<Score>
     {
         while (true)
         {
-            _scoreText.text = "Score: " + OverallScore;
+            _scoreText.SetText("Score: " + OverallScore);
 
             yield return new WaitForSeconds(0.1f);
         }
@@ -69,13 +72,20 @@ public class Score : Singleton<Score>
 
     public void ShowHighest()
     {
-
         CheckHighest();
-        _scoreText.fontSize = 160;
-
-
-        _highestScoreText.text = "Highest Score: " + (int)HighestScore;
+        _highestScoreText.SetText("Highest Score: " + (int)HighestScore);
         _highestScoreText.gameObject.SetActive(true);
+
+        ResetButton.gameObject.SetActive(true);
+        ToMenuButton.gameObject.SetActive(true);
+    }
+
+    public void ReloadScene() {
+        UnityEngine.SceneManagement.SceneManager.LoadScene(UnityEngine.SceneManagement.SceneManager.GetActiveScene().buildIndex);
+    }
+
+    public void MoveToMenu() {
+        UnityEngine.SceneManagement.SceneManager.LoadScene(UnityEngine.SceneManagement.SceneManager.GetActiveScene().buildIndex - 1);
     }
 }
 

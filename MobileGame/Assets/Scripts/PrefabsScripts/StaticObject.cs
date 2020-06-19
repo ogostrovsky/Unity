@@ -16,11 +16,11 @@ public class StaticObject : MonoBehaviour
     {
         while (true)
         {
-            if(Vector3.Distance(_player.transform.position, this.transform.position) > 220)
+            if(Vector3.Distance(_player.transform.position, this.transform.position) > 200)
             {
                 this.gameObject.SetActive(false);
             }
-            yield return new WaitForSeconds(0.5f);
+            yield return new WaitForSeconds(0.1f);
         }
     }
 }

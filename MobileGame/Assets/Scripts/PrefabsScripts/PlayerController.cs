@@ -1,9 +1,13 @@
 ﻿using System.Collections;
 using System.Collections.Generic;
+using UnityEngine.UI;
 using UnityEngine;
 
 public class PlayerController : MonoBehaviour
 {
+    [SerializeField] private Joystick joystick;
+    [SerializeField] private Button   fireButt;
+    [Space]
     [SerializeField] private float _moveSpeed;
     [SerializeField] private float _rotateSpeed;
     [SerializeField] private float _HP;
@@ -50,31 +54,22 @@ public class PlayerController : MonoBehaviour
     private float _time = 0;
     private void Controller()
     {
-        if (Input.GetKeyDown(KeyCode.Space))
-        {
-            if(Time.time > _time + _shootCoolDown)
-            {
-                _gun.Shoot();
-                _time = Time.time;
-            }
+        if (joystick.Horizontal != 0) {
+            transform.Rotate(new Vector3(0, joystick.Horizontal * _rotateSpeed * Time.deltaTime, 0));
         }
 
-        if (Input.GetKey(KeyCode.W))
-        {
-            this.transform.Translate(new Vector3(0, 0, _moveSpeed * Time.deltaTime));
-        }
-        else if (Input.GetKey(KeyCode.S))
-        {
-            this.transform.Translate(new Vector3(0, 0, -_moveSpeed * Time.deltaTime));
+        if (joystick.Vertical != 0) { 
+            transform.Translate(new Vector3(0, 0, joystick.Vertical * _moveSpeed * Time.deltaTime));
         }
 
-        if (Input.GetKey(KeyCode.A))
-        {
-            this.transform.Rotate(new Vector3(0, -_rotateSpeed * Time.deltaTime, 0));
-        }
-        else if (Input.GetKey(KeyCode.D))
-        {
-            this.transform.Rotate(new Vector3(0, _rotateSpeed * Time.deltaTime, 0));
-        }
+        if (transform.position.y <= -50f)
+            OnDead();
     } 
+
+    public void Shoting() {
+        if (Time.time > _time + _shootCoolDown) {
+            _gun.Shoot();
+            _time = Time.time;
+        }
+    }
 }

@@ -15,9 +15,4 @@ public class Button_Manager : Singleton<Button_Manager>
     {
         Application.Quit();
     }
-
-    public void CheckKKK()
-    {
-        Debug.Log("The scene is on load: ");
-    }
 }
