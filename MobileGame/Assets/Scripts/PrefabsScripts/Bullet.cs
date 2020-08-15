@@ -10,7 +10,6 @@ public class Bullet : MonoBehaviour
 
     private void OnEnable()
     {
-        
         StartCoroutine(Lifetime());
     }
 
@@ -18,28 +17,27 @@ public class Bullet : MonoBehaviour
     {
         var rig = other.GetComponent<Rigidbody>();
         {
-            if(rig != null)
-            {
-                rig.AddForce(this.transform.up * 1000);
-            }
+            if(rig != null) rig.AddForce(transform.up * 1000);
         }
-        
         gameObject.SetActive(false);
     }
 
     private IEnumerator Lifetime()
     {
+        var vect = new Vector3(0, Speed, 0);
         while (true)
         {
-            this.transform.Translate(new Vector3(0, Speed * Time.deltaTime, 0));// пуля летит
-
+            transform.Translate(vect * Time.deltaTime);// пуля летит
             if (LifeTime < 0)
             {
-                this.gameObject.SetActive(false);
+                gameObject.SetActive(false);
             }
             LifeTime -= Time.deltaTime;
-
-            yield return new WaitForFixedUpdate();
+            yield return null;
         }
+    }
+
+    private void OnDisable(){
+        PoolManager.Instance.PutObj(gameObject);
     }
 }

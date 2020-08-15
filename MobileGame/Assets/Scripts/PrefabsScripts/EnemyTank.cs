@@ -7,340 +7,314 @@ using UnityEngine.UIElements;
 using System.Linq;
 using System.Xml.Serialization;
 
-public class EnemyTank : MonoBehaviour
+public class EnemyTank : Unit
 {
-    [SerializeField] private float _HP;
-    [SerializeField] private float _DMG;
+    [Space(5)]
+    [SerializeField] private float moveSpeed = 5;
+    [SerializeField] private float rotationSpeed = 5;
+    [SerializeField] private float distanceToReact = 5;
+    [SerializeField] private float difficultyIncrease = 5;
 
-    [SerializeField] private float _minMoveSpeed;
-    [SerializeField] private float _maxMoveSpeed;
+    [Space(5)]
+    [SerializeField] private float maxDamage = 5;
+    [SerializeField] private float maxMoveSpeed = 5;
+    [SerializeField] private float maxRotationSpeed = 5;
+    [SerializeField] private float maxDistanceToReact = 5;
+    [SerializeField] private float maxLocalScale = 5;
 
-    [SerializeField] private float _minRotateSpeed;
-    [SerializeField] private float _maxRotateSpeed;
+    [Space(5)]
+    private GameObject          player;
+    private bool                playerCanBeAttacked;
+    private bool                sideRaysAlarm;
+    private bool                isTurning;
+    [SerializeField] private GameObject TankDoll;
 
-    [SerializeField] private float _minDistanceToReact;
-    [SerializeField] private float _MaxDistanceToReact;
-
-    [SerializeField] private float _difficultyIncrease;
-
-    [SerializeField] private GameObject _player;
-    private bool _playerCanBeAttacked = false; 
-    
-    private List<SideRay> _sideRaysList; //список боковых сенсоров
-    private Ray _aimRay; //рей который направлен вперёд
-    private Gun _gun; //пушка танка
-    private Renderer[] _rendsArr;
-
-    private void Awake()
+    protected override void OnEnable()
     {
-        
+        base.OnEnable();
+
+        player = GameObject.Find("Player");
+
+        BoolsInit();
+
+        DollInit();
+
+        ColorInit();
+
+        StartCoroutine(PlayerCanBeAttackedTracker());
+
+        StartCoroutine(PathFinderController());
+
+        StartCoroutine(StateMachene());
     }
 
-
-
-    private void OnEnable()
+    private void BoolsInit()
     {
-        _sideRaysList = new List<SideRay>(GetComponentsInChildren<SideRay>()); //получаем боковые рейкасты
-        _player = GameObject.FindGameObjectWithTag("Player"); // находим плеера на сцене 
-        _aimRay = GetComponentInChildren<Ray>(); //цепляем рейкаст для пушки 
-        _gun = GetComponentInChildren<Gun>(); //цепляем пушку 
-        _rendsArr = GetComponentsInChildren<Renderer>();
-        ColorRandomizer();
-
-
-        _hp = _HP;//обновляем хп.
-        StartCoroutine(StateMachene()); //запускаем основную логику моба
-        StartCoroutine(PositionTrecker()); // паралельная проверка состояния моба в пространстве
+        playerCanBeAttacked = false;
+        sideRaysAlarm = false;
+        isTurning = false;
     }
-
-    //точка входа для логики моба
     private IEnumerator StateMachene()
     {
         while (true)
         {
-            if (_playerCanBeAttacked)
-            {   // если игрок в области поражения начинаем его бомбить
-                yield return StartCoroutine(Battle());
-            }
-
-            else if (GetRaysStatus())
-            {   // пока лучи не вылезли за край карты поочерёдно включаем - то мув - то айдл
-                yield return StartCoroutine(Move());
-                yield return StartCoroutine(Idle());
-            }
-            
-            else if(!GetRaysStatus())
-            {   //нащупали пропасть, сворачиваем 
-                yield return StartCoroutine(Turn());
-            }
-            yield return new WaitForSeconds(0.04f);
+            if (playerCanBeAttacked)    yield return StartCoroutine(Battle());
+            else if (!sideRaysAlarm)    yield return StartCoroutine(Idle());
+            yield return null;
         }
     }
-
-    private IEnumerator PositionTrecker()
+    private IEnumerator PlayerCanBeAttackedTracker()
     {
+        var delay = new WaitForSeconds(0.2f);
         while (true)
         {
-            if (transform.position.y < -50)
-            {//выключаем моба если он свалился с платформы 
-                Dying();
-                gameObject.SetActive(false);
-            }
-
-            var distToPlayer = Vector3.Distance(_player.transform.position, this.transform.position);
-            if (distToPlayer < _minDistanceToReact)//даём знеать можно ли атаковать плеера
+            var distToPlayer = Vector3.Distance(player.transform.position, transform.position);
+            if (distToPlayer < distanceToReact)
             {
                 if (ObstaclesChecker())
                 {
-                    _playerCanBeAttacked = true;
+                    playerCanBeAttacked = true;
                 }
                 else
                 {
-                    _playerCanBeAttacked = false;
+                    playerCanBeAttacked = false;
                 }
             }
             else
             {
-                _playerCanBeAttacked = false;
+                playerCanBeAttacked = false;
             }
-            yield return new WaitForSeconds(0.2f);
+            yield return delay;
         }
     }
-
-    private IEnumerator Move()
-    {   //рандомим продолжительность движения вперёд
-        var _time = SmallRandomizer(1f, 4f); 
-        while (_time > 0 && GetRaysStatus() && !_playerCanBeAttacked)
-        {
-            _time -= Time.deltaTime;
-            MoveForvard();
-            yield return new WaitForSeconds(0.04f);
-        }
-    }
-
     private IEnumerator Idle()
     {
-        int _actionsAmount = SmallRandomizer(1, 4);//рандомим количество действий что будет совершено в айдле
-        int _switcher;      //рандомим следующее действие которое будем совершать
-
-        while (_actionsAmount > 0 && GetRaysStatus() && !_playerCanBeAttacked)
+        switch (UnityEngine.Random.Range(0, 6))
         {
-            _switcher = SmallRandomizer(0, 4);
-            switch (_switcher)
-            {
-                case 0: //поворачиваем рандомное количество времени стоя
-                    yield return StartCoroutine(SimpleCorutine(0.3f, 0.5f, () => RotateLeft()));
-                    break;
+            case 0: //поворачиваем рандомное количество времени стоя
+                yield return StartCoroutine(IdleCorutine(0.3f, 0.5f, () => RotateLeft()));
+                break;
 
-                case 1: //поворачиваем рандомное количество времени в другую сторону стоя
-                    yield return StartCoroutine(SimpleCorutine(0.3f, 0.5f, () => RotateRight()));
-                    break;
+            case 1: //поворачиваем рандомное количество времени в другую сторону стоя
+                yield return StartCoroutine(IdleCorutine(0.3f, 0.5f, () => RotateRight()));
+                break;
 
-                case 2: //поворачиваем и едем рандомное количество времени
-                    yield return StartCoroutine(SimpleCorutine(0.3f, 0.8f, () => MoveForvard(), () => RotateLeft()));
-                    break;
+            case 2: //поворачиваем и едем рандомное количество времени
+                yield return StartCoroutine(IdleCorutine(0.3f, 0.8f, () => MoveForvard(), () => RotateLeft()));
+                break;
 
-                case 3://поворачиваем и едем рандомное количество времени в другую сторону
-                    yield return StartCoroutine(SimpleCorutine(0.3f, 0.8f, () => MoveForvard(), () => RotateRight()));
-                    break;
-            }
-            _actionsAmount--;
-            yield return new WaitForSeconds(0.04f);
+            case 3://поворачиваем и едем рандомное количество времени в другую сторону
+                yield return StartCoroutine(IdleCorutine(0.3f, 0.8f, () => MoveForvard(), () => RotateRight()));
+                break;
+
+            case 4:
+                yield return StartCoroutine(IdleCorutine(1f, 3f, () => MoveForvard()));
+                break;
+
+            case 5:
+                yield return StartCoroutine(IdleCorutine(2f, 5f, () => MoveForvard()));
+                break;
         }
     }
-
-    private IEnumerator Turn()
-    {
-        var _str = GetTrigerredRayName(); // узнаём откуда вспышка
-        var _time = SmallRandomizer(0.1f, 0.3f); // рандомим время которое поворот будет продолжаться после того как рей уже залез на платформу чтоб избежать дёрганья моба вдоль края карты
-
-        while (_time > 0 && !_playerCanBeAttacked)
-        {
-            if (GetRaysStatus())
-            {   //когда луч заехал на платформу начинаем отсчитывать время до перехода в другое состояние
-                _time -= Time.deltaTime;
-            }
-            ChangeDirection(_str);
-            yield return new WaitForSeconds(0.04f);
-        }
-    }
-
     private IEnumerator Battle()
     {
-        while (_player.activeInHierarchy && _playerCanBeAttacked)
+        var delay = new WaitForSeconds(0.02f);
+        while (playerCanBeAttacked) 
         {
-            var targetRotation = Quaternion.LookRotation(_player.transform.position - transform.position);//выбираем куда поворачивать
-            transform.rotation = Quaternion.RotateTowards(transform.rotation, targetRotation, _minRotateSpeed * Time.deltaTime);
-
-            if (_aimRay.FindedTag == "Player")
-            {//если упёрлись лучом в плеера начинаем стрелять рандомное количество раз 
-                yield return StartCoroutine(SimpleCorutine(1, 5, () => _gun.Shoot()));
-            }
-            yield return new WaitForSeconds(0.04f);
-        }
-    }
-
-    private void OnTriggerEnter(Collider other)
-    {   //понималка того влетела ли в танк пуля
-        if (other.gameObject.tag == "Bullet")
-        {
-            ReduceHP(other.GetComponent<Bullet>().Damage);//узнаём урон пули
-        }
-    }
-
-    private string[] _avoidable = {"EnemyTank", "Cube", "Player"}; //список сущностей которое моб должен избегать
-    private bool GetRaysStatus()
-    {   //определяет статус всех реев на родителе
-        foreach (var ray in _sideRaysList)
-        {
-            if (!ray.State || _avoidable.Contains(ray.FindedTag))
+            var rayOrigin = transform.position + transform.forward * 2;
+            if (RayCast(rayOrigin, transform.forward, distanceToReact * 2) == "Player")
             {
-                return false;
+                yield return StartCoroutine(FireCorutine(1, 5, 0.3f, () => gun.Shoot()));
             }
+            var startRotation = transform.rotation;
+            var targetRotation = Quaternion.LookRotation(player.transform.position - transform.position);
+
+            transform.rotation = Quaternion.RotateTowards(startRotation, targetRotation, Time.deltaTime * rotationSpeed);
+            yield return delay;
         }
-        return true;
     }
-    private string GetTrigerredRayName()
+    private IEnumerator FireCorutine(int min, int max, float attackSpeed, Action Method)
     {
-        foreach (var ray in _sideRaysList)
+        var delay = new WaitForSeconds(attackSpeed);
+        var iterations = UnityEngine.Random.Range(min, max);
+        while (iterations > 0 && playerCanBeAttacked)
         {
-            if (!ray.State || _avoidable.Contains(ray.FindedTag))
-            {//возвращаем имя луча от которого нужно поворачивать танк в противоположную сторону
-                return ray.name;
-            }
+            Method();
+            iterations--;
+            yield return delay;
         }
-        return "noName";
+    }
+    private IEnumerator IdleCorutine(float min, float max, Action Method)
+    {
+        var delay = new WaitForSeconds(0.02f);
+        var _time = UnityEngine.Random.Range(min, max);
+        while (_time > 0 && !playerCanBeAttacked && !sideRaysAlarm)
+        {
+            Method();
+            _time -= Time.deltaTime;
+            yield return delay;
+        }
+    }
+    private IEnumerator IdleCorutine(float min, float max, Action Method1, Action Method2)
+    {
+        var _time = UnityEngine.Random.Range(min, max);
+        var delay = new WaitForSeconds(0.02f);
+        while (_time > 0 && !playerCanBeAttacked && !sideRaysAlarm)
+        {
+            Method1();
+            Method2();
+            _time -= Time.deltaTime;
+            yield return delay;
+        }
+    }
+    private IEnumerator PathFinderController()
+    {
+        var delay = new WaitForSeconds(0.1f);
+        while (true)
+        {
+            var leftrayOrigin = transform.position + transform.forward * 3 + transform.right * -2 + transform.up * 15;
+            var rightrayOrigin = transform.position + transform.forward * 3 + transform.right * 2 + transform.up * 15;
+
+            var rayLeft = RayCast(leftrayOrigin, Vector3.down, 30);
+            var rayRight = RayCast(rightrayOrigin, Vector3.down, 30);
+
+            if (!isTurning && !playerCanBeAttacked)
+            {
+                if (!String.Equals(rayLeft, "Section"))
+                {
+                    StartCoroutine(TurnCoroutine(true));
+                }
+                else if (!String.Equals(rayRight, "Section"))
+                {
+                    StartCoroutine(TurnCoroutine(false));
+                }
+            }
+            else if (rayLeft != "Section" || rayRight != "Section")
+            {
+                sideRaysAlarm = true;
+            }
+            else
+            {
+                sideRaysAlarm = false;
+            }
+            yield return delay;
+        }
+    }
+    private IEnumerator TurnCoroutine(bool left)
+    {
+        isTurning = true;
+        var delay = new WaitForSeconds(0.02f);
+        var addTurnTime = UnityEngine.Random.Range(0.2f, 0.4f);
+
+        while (addTurnTime > 0 && !playerCanBeAttacked)
+        {
+            if (left) RotateRight();
+            else      RotateLeft();
+
+            if (!sideRaysAlarm) addTurnTime -= Time.deltaTime;
+            yield return delay;
+        }
+        isTurning = false;
+    }
+    private string RayCast(Vector3 origin, Vector3 direction, float range)
+    {
+        RaycastHit hit;
+        Physics.Raycast(origin, direction, out hit, range);
+        if (hit.collider == null)
+        {
+            Debug.DrawRay(origin, direction * range, Color.red);
+            return null;
+        }
+        else
+        {
+            Debug.DrawRay(origin, direction * range, Color.white);
+            return hit.collider.tag;
+        }
+    }
+    protected override void onBeforeDeath()
+    {
+        Score.Instance.KilledTanksScore += savedHP;
+        DifficultyIncreasing();
+        base.onBeforeDeath();
+        TankExplodeOnDie();
     }
 
-    private void ChangeDirection(string str)
-    {   //основываясь на местоположении сигнала определяет в какую сторону разворачивать танк
-        if (str.Equals("RightRay"))
+    private void TankExplodeOnDie()
+    {
+        TankDoll.transform.position = transform.position;
+        TankDoll.transform.rotation = transform.rotation;
+        TankDoll.SetActive(true);
+
+        var explosionCenter = explosionCenterPointRandomizer();
+        var explosionPower = UnityEngine.Random.Range(500f, 2500f);
+        foreach (var i in TankDoll.GetComponentsInChildren<Rigidbody>())
         {
-            RotateLeft();
-        }
-        else if (str.Equals("LeftRay"))
-        {
-            RotateRight();
+            i.AddExplosionForce(explosionPower, explosionCenter, 5f);
         }
     }
 
-   private void ColorRandomizer()
+    private Vector3 explosionCenterPointRandomizer()
     {
-        var Color = new Color(SmallRandomizer(0f, 1f), SmallRandomizer(0f, 1f), SmallRandomizer(0f, 1f), 1);
-        foreach (var rend in _rendsArr)
+        return transform.position 
+            + new Vector3(
+                UnityEngine.Random.Range(-1.5f, 1.5f),
+                UnityEngine.Random.Range(-1.5f, 0),
+                UnityEngine.Random.Range(-1.5f, 1.5f));
+    }
+    private void ColorInit()
+    {
+        var rendsArr = GetComponentsInChildren<Renderer>().Concat(TankDoll.GetComponentsInChildren<Renderer>()).ToArray(); // combining 2 arrays doll and tank's
+        var Color = new Color(UnityEngine.Random.Range(0f, 1f), UnityEngine.Random.Range(0f, 1f), UnityEngine.Random.Range(0f, 1f), 1);
+        foreach (var rend in rendsArr)
         {
             rend.material.color = Color;
         }
     }
-
-    private void DifficultyIncreasing()
-    {
-        _HP = _HP * _difficultyIncrease;
-        _DMG = _DMG * _difficultyIncrease;
-        if(_minMoveSpeed < _maxMoveSpeed)
-        {
-            _minMoveSpeed += _difficultyIncrease;
-        }
-        if(_minRotateSpeed < _maxRotateSpeed)
-        {
-            _minRotateSpeed = _minRotateSpeed * _difficultyIncrease;
-        }
-        if(_minDistanceToReact < _MaxDistanceToReact)
-        {
-            _minDistanceToReact = _minDistanceToReact * _difficultyIncrease;
-        }
-        if (this.transform.localScale.x < 2.5)
-        {
-            this.transform.localScale += new Vector3(0.1f, 0.1f, 0.1f);
-        }
-    }
-
-    private float _hp;
-    private void ReduceHP(float damage)
-    {
-        _hp -= damage;
-        if(_hp <= 0)
-        {
-            Dying();
-        }
-    }
-    private void Dying()
-    {
-        Score.Instance.KilledTanksScore += _HP;
-        DifficultyIncreasing();
-
-        this.gameObject.SetActive(false);
-    }
-
     private void MoveForvard()
     {
-        this.transform.Translate(new Vector3(0, 0, _minMoveSpeed * Time.deltaTime));
+        transform.Translate(new Vector3(0, 0, moveSpeed * Time.deltaTime));
     }
     private void RotateLeft()
     {
-        this.transform.Rotate(new Vector3(0, -_minRotateSpeed * Time.deltaTime, 0));
+        transform.Rotate(new Vector3(0, -rotationSpeed * Time.deltaTime, 0));
     }
     private void RotateRight()
     {
-        this.transform.Rotate(new Vector3(0, _minRotateSpeed * Time.deltaTime, 0));
+        transform.Rotate(new Vector3(0, rotationSpeed * Time.deltaTime, 0));
     }
-
     private bool ObstaclesChecker()
     {
-        RaycastHit hit;
-        var pos = new Vector3(this.transform.position.x, this.transform.position.y + 2, this.transform.position.z);
-
-        Physics.Raycast(pos, _player.transform.position - pos, out hit, _minDistanceToReact);
-        Debug.DrawRay(pos, (_player.transform.position - pos), Color.yellow);
-
-        if (hit.collider != null)
+        var rayOrigin = transform.position + transform.up * 2;
+        var direction = (player.transform.position - rayOrigin).normalized;
+        var rayInfo = RayCast(rayOrigin, direction, distanceToReact);
+        if (rayInfo != null)
         {
-            if(hit.transform.tag == "Player")
+            if (String.Equals(rayInfo, "Player"))
             {
                 return true;
             }
         }
         return false;
     }
+    private void DifficultyIncreasing()
+    {
+        savedHP *= difficultyIncrease;
 
-    private int SmallRandomizer(int min, int max)
-    {
-        return UnityEngine.Random.Range(min, max);
+        damage    *= difficultyIncrease;
+
+        if (moveSpeed               < maxMoveSpeed)        moveSpeed              += difficultyIncrease;
+        if (rotationSpeed           < maxRotationSpeed)    rotationSpeed          += difficultyIncrease;    
+        if (distanceToReact         < maxDistanceToReact)  distanceToReact        += difficultyIncrease;
+        if (transform.localScale.x  < maxLocalScale)       transform.localScale   += new Vector3(0.1f, 0.1f, 0.1f);
     }
-    private float SmallRandomizer(float min, float max)
+    private void DollInit()
     {
-        return UnityEngine.Random.Range(min, max);
+        TankDoll = PoolManager.Instance.GetObj(TankDoll);
+        TankDoll.transform.localScale = transform.localScale;
     }
 
-    private IEnumerator SimpleCorutine(int min, int max, Action Method)
+    private void OnDisable()
     {
-        var _times = SmallRandomizer(min, max);
-        while (_times > 0)
-        {
-            Method();
-            _times--;
-            yield return new WaitForSeconds(0.3f);
-        }
-    }
-    private IEnumerator SimpleCorutine(float min, float max, Action Method)
-    {
-        var _time = SmallRandomizer(min, max);
-        while (_time > 0)
-        {
-            Method();
-            _time -= Time.deltaTime;
-            yield return new WaitForSeconds(0.04f);
-        }
-    }
-    private IEnumerator SimpleCorutine(float min, float max, Action Method1, Action Method2)
-    {
-        var _time = SmallRandomizer(min, max);
-        while (_time > 0)
-        {
-            Method1();
-            Method2();
-            _time -= Time.deltaTime;
-            yield return new WaitForSeconds(0.04f);
-        }
+        PoolManager.Instance.PutObj(gameObject);
     }
 }

@@ -4,15 +4,27 @@ using UnityEngine;
 
 public class Gun : MonoBehaviour
 {
-    [SerializeField] private float _damage;
-    [SerializeField] private float _speed;
-    [SerializeField] private float _bulletLifeTime;
+    private ScriptableObject Father;
+
+    private GameObject bullet;
+    private float _damage;
+    private float _speed;
+    private float _bulletLifeTime;
+
+    public void OnInit(float damage, float speed, float bulletLifeTime, GameObject bullet)
+    {
+        _damage = damage;
+        _speed = speed;
+        _bulletLifeTime = bulletLifeTime;
+        this.bullet = bullet;
+    }
+
 
     public void Shoot()
     {
-        var obj = PoolManager.Instance.GetObj(PoolType.BULLETS);
-        obj.transform.position = this.transform.position;
-        obj.transform.rotation = this.transform.rotation;
+        var obj = PoolManager.Instance.GetObj(bullet);
+        obj.transform.position = transform.position;
+        obj.transform.rotation = transform.rotation;
 
         var sriptObj = obj.GetComponent<Bullet>();
 

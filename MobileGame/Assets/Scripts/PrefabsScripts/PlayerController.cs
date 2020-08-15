@@ -3,73 +3,67 @@ using System.Collections.Generic;
 using UnityEngine.UI;
 using UnityEngine;
 
-public class PlayerController : MonoBehaviour
+public class PlayerController : Unit
 {
-    [SerializeField] private Joystick joystick;
-    [SerializeField] private Button   fireButt;
-    [Space]
-    [SerializeField] private float _moveSpeed;
-    [SerializeField] private float _rotateSpeed;
-    [SerializeField] private float _HP;
-    [SerializeField] private float _shootCoolDown;
+    [Space(15)]
+    [SerializeField] private Joystick   joystick;
     [SerializeField] private GameObject Camera;
 
+    [Space (15)]
+    [SerializeField] private float          _moveSpeed;
+    [SerializeField] private float          _rotateSpeed;
 
-    private Gun _gun;
+    [Space(15)]
+    [SerializeField] private float          _shootCoolDown;
 
-    private void Start()
+    [Space(15)]
+    [SerializeField] private Slider hpBar;
+
+    protected override void FixedUpdate()
     {
-        _gun = GetComponentInChildren<Gun>();
+        MovingController();
+        base.FixedUpdate();
     }
 
-    private void FixedUpdate()
-    {
-        Controller();
-    }
-
-    void OnTriggerEnter(Collider other)
-    {
-        if (other.gameObject.tag == "Bullet")
-        {
-            ReduceHP(other.GetComponent<Bullet>().Damage);//узнаём урон пули
-        }
-    }
-
-    private void ReduceHP(float damage)
-    {
-        _HP -= damage;
-        if (_HP <= 0)
-        {
-            OnDead();
-            this.gameObject.SetActive(false);
-        }
-    }
-
-    private void OnDead()
+    protected override void onBeforeDeath()
     {
         Camera.transform.parent = null;
         Score.Instance.ShowHighest();
+        base.onBeforeDeath();
     }
 
-    private float _time = 0;
-    private void Controller()
+    private void MovingController()
     {
         if (joystick.Horizontal != 0) {
-            transform.Rotate(new Vector3(0, joystick.Horizontal * _rotateSpeed * Time.deltaTime, 0));
+            transform.Rotate(new Vector3(0, joystick.Horizontal * _rotateSpeed * Time.deltaTime));
         }
 
         if (joystick.Vertical != 0) { 
             transform.Translate(new Vector3(0, 0, joystick.Vertical * _moveSpeed * Time.deltaTime));
         }
 
-        if (transform.position.y <= -50f)
-            OnDead();
-    } 
+        if (Input.GetKeyDown(KeyCode.Space))
+        {
 
-    public void Shoting() {
-        if (Time.time > _time + _shootCoolDown) {
-            _gun.Shoot();
-            _time = Time.time;
+            GetComponentInChildren<Mesh>();
+
+
+
         }
+    }
+
+    private float _timeFromLastShot = 0f;
+    public void Fire() {
+        if (Time.time > _timeFromLastShot + _shootCoolDown) {
+            gun.Shoot();
+            _timeFromLastShot = Time.time;
+        }
+    }
+
+    protected override void HpBarInit()
+    {
+        HpBarUI = hpBar;
+        hpBar.maxValue = HP;
+        hpBar.value = HP;
     }
 }
